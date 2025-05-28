@@ -3,6 +3,8 @@
 > Un ecosistema sperimentale per l’apprendimento collaborativo uomo–AI  
 > *Blueprint ufficiale – Maggio 2025*
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+
 ---
 
 ## 🚀 Visione
