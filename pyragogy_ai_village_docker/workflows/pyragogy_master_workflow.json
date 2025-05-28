@@ -1,0 +1,538 @@
+{
+  "name": "Pyragogy AI Village - Master Orchestration",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [50, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pyragogy/process",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "pyragogy-master-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT 1; -- Check DB connection",
+        "options": {}
+      },
+      "name": "Check DB Connection",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Meta-orchestrator of the Pyragogy AI Village. Your task is to analyze the input and determine the optimal agent sequence for processing. Consider the input type, complexity, and goals. Available agents: Summarizer, Synthesizer, Peer Reviewer, Sensemaking Agent, Prompt Engineer, Onboarding/Explainer, Archivist. Return a JSON array of agent names in the order they should run, e.g., [\"Summarizer\", \"Synthesizer\", \"Peer Reviewer\", \"Archivist\"]. Include \"Archivist\" last if persistence is needed."
+          },
+          {
+            "role": "user",
+            "content": "Input Data:\n{{ JSON.stringify($json.body) }}"
+          }
+        ],
+        "options": {
+          "response_format": {
+            "type": "json_object"
+          }
+        }
+      },
+      "name": "Meta-Orchestrator",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Parse the orchestration plan and set up for looping\nconst plan = JSON.parse($json.choices[0].message.content);\nconst agentSequence = plan.agents || [];\n\n// Store the sequence and current index for the loop\n$workflow.agentSequence = agentSequence;\n$workflow.currentAgentIndex = 0;\n\n// Pass input data to the first agent\nreturn [{ json: { ...$items[0].json.body, agentToRun: agentSequence[0] } }];"
+      },
+      "name": "Parse Orchestration Plan",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $workflow.currentAgentIndex < $workflow.agentSequence.length }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "More Agents to Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the current agent name\nconst agentName = $workflow.agentSequence[$workflow.currentAgentIndex];\n\n// Prepare data for the agent execution\n// Pass the output from the previous step (or initial input)\nconst previousOutput = $json.output || $json.body.input; // Assuming agent output is stored in 'output' key\n\nreturn [{ json: { ...$json, agentToRun: agentName, agentInput: previousOutput } }];"
+      },
+      "name": "Prepare Agent Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Summarizer"
+            }
+          ]
+        }
+      },
+      "name": "Route to Agent",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Summarizer Agent. Summarize the provided text into 3 key points."
+          },
+          {
+            "role": "user",
+            "content": "Text to summarize:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Summarizer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1650, 0],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Synthesizer"
+            }
+          ]
+        }
+      },
+      "name": "Is Synthesizer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Synthesizer Agent. Synthesize a creative new text from the given key points or input."
+          },
+          {
+            "role": "user",
+            "content": "Input for synthesis:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Synthesizer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1850, 100],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Peer Reviewer"
+            }
+          ]
+        }
+      },
+      "name": "Is Peer Reviewer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Peer Reviewer Agent. Review the provided text, highlight strengths, weaknesses, and provide actionable suggestions for improvement."
+          },
+          {
+            "role": "user",
+            "content": "Text to review:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Peer Reviewer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1850, 200],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Sensemaking Agent"
+            }
+          ]
+        }
+      },
+      "name": "Is Sensemaking?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Sensemaking Agent. Analyze the input, connect it with existing knowledge (context provided), identify patterns, gaps, and suggest new directions."
+          },
+          {
+            "role": "user",
+            "content": "Input to analyze:\n{{ $json.agentInput }}\n\nContext from DB (if available):\n{{ $json.dbContext }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Sensemaking Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1850, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Prompt Engineer"
+            }
+          ]
+        }
+      },
+      "name": "Is Prompt Engineer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Prompt Engineer Agent. Analyze the current task context and the next agent in the sequence. Refine or generate an optimal prompt for the next agent."
+          },
+          {
+            "role": "user",
+            "content": "Current context:\n{{ JSON.stringify($json) }}\nNext agent: {{ $workflow.agentSequence[$workflow.currentAgentIndex + 1] || 'None' }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Prompt Engineer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1850, 400],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Onboarding/Explainer"
+            }
+          ]
+        }
+      },
+      "name": "Is Explainer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "apiKey",
+        "resource": "chat",
+        "model": "gpt-4o",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are the Onboarding/Explainer Agent. Explain the current process, the result achieved so far, or provide guidance based on the input."
+          },
+          {
+            "role": "user",
+            "content": "Explain the following:\n{{ $json.agentInput }}"
+          }
+        ],
+        "options": {}
+      },
+      "name": "Onboarding/Explainer Agent",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1850, 500],
+      "credentials": {
+        "openAiApi": {
+          "id": "pyragogy-openai",
+          "name": "OpenAI Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.agentToRun }}",
+              "operation": "equal",
+              "value2": "Archivist"
+            }
+          ]
+        }
+      },
+      "name": "Is Archivist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 600]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "handbook_entries",
+        "columns": "title, content, version, created_by, tags",
+        "values": "={{ $json.title || 'Untitled' }}, {{ $json.agentInput }}, {{ $json.version || 1 }}, {{ $json.author || 'AI Village' }}, ARRAY[{{ ($json.tags || []).map(t => `'${t}'`).join(',') }}]",
+        "options": {
+          "returning": "id"
+        }
+      },
+      "name": "Save to handbook_entries",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1850, 600],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Record agent contribution\nconst entryId = $json.id; // ID from the handbook_entries insert\nconst agentName = $json.agentToRun;\nconst contributionType = 'Archiving';\nconst details = { input: $json.agentInput, metadata: { title: $json.title, version: $json.version, tags: $json.tags } };\n\n$items[0].json.contribution = { entryId, agentName, contributionType, details };\nreturn $items;",
+        "jsOptions": {}
+      },
+      "name": "Prepare Contribution Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2050, 600]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "agent_contributions",
+        "columns": "entry_id, agent_name, contribution_type, details",
+        "values": "={{ $json.contribution.entryId }}, {{ $json.contribution.agentName }}, {{ $json.contribution.contributionType }}, {{ JSON.stringify($json.contribution.details) }}",
+        "options": {}
+      },
+      "name": "Save Agent Contribution",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [2250, 600],
+      "credentials": {
+        "postgres": {
+          "id": "pyragogy-postgres",
+          "name": "Postgres Pyragogy DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Prepare output from the executed agent\nconst agentName = $json.agentToRun;\nlet agentOutput = '';\nif ($node[\"Summarizer Agent\"] && $node[\"Summarizer Agent\"]?.json?.choices?.[0]?.message?.content) {\n  agentOutput = $node[\"Summarizer Agent\"].json.choices[0].message.content;\n} else if ($node[\"Synthesizer Agent\"] && $node[\"Synthesizer Agent\"]?.json?.choices?.[0]?.message?.content) {\n  agentOutput = $node[\"Synthesizer Agent\"].json.choices[0].message.content;\n} else if ($node[\"Peer Reviewer Agent\"] && $node[\"Peer Reviewer Agent\"]?.json?.choices?.[0]?.message?.content) {\n  agentOutput = $node[\"Peer Reviewer Agent\"].json.choices[0].message.content;\n} else if ($node[\"Sensemaking Agent\"] && $node[\"Sensemaking Agent\"]?.json?.choices?.[0]?.message?.content) {\n  agentOutput = $node[\"Sensemaking Agent\"].json.choices[0].message.content;\n} else if ($node[\"Prompt Engineer Agent\"] && $node[\"Prompt Engineer Agent\"]?.json?.choices?.[0]?.message?.content) {\n  // Prompt engineer might output a refined prompt or analysis\n  agentOutput = $node[\"Prompt Engineer Agent\"].json.choices[0].message.content; \n} else if ($node[\"Onboarding/Explainer Agent\"] && $node[\"Onboarding/Explainer Agent\"]?.json?.choices?.[0]?.message?.content) {\n  agentOutput = $node[\"Onboarding/Explainer Agent\"].json.choices[0].message.content;\n} else if ($node[\"Save Agent Contribution\"]) {\n  // Archivist output is the confirmation/metadata\n  agentOutput = { message: 'Archived successfully', entryId: $json.contribution.entryId };\n}\n\n// Record contribution (simplified for this example)\nconst contribution = { agent: agentName, output: agentOutput, timestamp: new Date().toISOString() };\nconst existingContributions = $json.contributions || [];\n\n// Increment agent index for the loop\n$workflow.currentAgentIndex += 1;\n\nreturn [{ json: { ...$items[0].json, output: agentOutput, contributions: [...existingContributions, contribution] } }];"
+      },
+      "name": "Process Agent Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2050, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $env.GITHUB_ACCESS_TOKEN && $json.agentToRun === 'Archivist' }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "GitHub Enabled & Archivist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2450, 600]
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "file",
+        "operation": "createUpdate",
+        "owner": "={{ $env.GITHUB_REPOSITORY_OWNER }}",
+        "repository": "={{ $env.GITHUB_REPOSITORY_NAME }}",
+        "filePath": "={{ `content/${$json.title.replace(/[^a-zA-Z0-9]/g, '-')}.md` }}",
+        "fileContent": "={{ $json.agentInput }}",
+        "commitMessage": "={{ `[BOT] Add/Update: ${$json.title}` }}",
+        "options": {}
+      },
+      "name": "Commit to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [2650, 600],
+      "credentials": {
+        "githubApi": {
+          "id": "pyragogy-github",
+          "name": "GitHub Pyragogy"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $env.SLACK_WEBHOOK_URL }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Slack Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "webhookUrl": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "text": "Pyragogy AI Village Workflow Complete!\nInput: {{ $json.body.input }}\nFinal Output: {{ JSON.stringify($json.output) }}\nAgents Run: {{ $workflow.agentSequence.join(', ') }}",
+        "options": {}
+      },
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { finalOutput: $json.output, contributions: $json.contributions, agentSequence: $workflow.agentSequence } }}",
+        "options": {}
+      },
+      "name": "Final Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+  },
+  "settings": {},
+  "pinData": {},
+  "active": false,
+  "version": 1,
+  "versionId": "pyragogy-ai-village-1"
+}
+

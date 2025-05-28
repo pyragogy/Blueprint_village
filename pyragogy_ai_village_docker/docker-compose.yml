@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: pyragogy-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pyragogy
+      POSTGRES_PASSWORD: pyragogy_secure_password
+      POSTGRES_DB: pyragogy
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pyragogy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pyragogy-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # n8n workflow automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: pyragogy-n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=pyragogy
+      - DB_POSTGRESDB_USER=pyragogy
+      - DB_POSTGRESDB_PASSWORD=pyragogy_secure_password
+      - N8N_ENCRYPTION_KEY=pyragogy_encryption_key_change_me
+      # Uncomment to set OpenAI API key directly in docker-compose
+      # - N8N_AI_OPENAI_API_KEY=your_openai_api_key
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./workflows:/home/node/.n8n/workflows
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pyragogy-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Grafana for monitoring and visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pyragogy-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=pyragogy_grafana_password
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - postgres
+    networks:
+      - pyragogy-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Nginx for serving static content and reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: pyragogy-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/html:/usr/share/nginx/html
+    depends_on:
+      - n8n
+      - grafana
+    networks:
+      - pyragogy-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+networks:
+  pyragogy-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: pyragogy-postgres-data
+  n8n-data:
+    name: pyragogy-n8n-data
+  grafana-data:
+    name: pyragogy-grafana-data

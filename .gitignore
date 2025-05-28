@@ -1,0 +1,68 @@
+# Node.js / n8n
+node_modules/
+dist/
+.env
+.env.*
+*.local
+*.log
+.n8n/
+n8n_data/
+.nyc_output/
+
+# Docker
+*.pid
+docker-compose.override.yml
+docker-compose.local.yml
+docker.env
+volumes/
+logs/
+tmp/
+*.bak
+
+# Database & secrets
+*.sqlite
+*.db
+*.pgsql
+*.dump
+*.bak
+*.psql
+.DS_Store
+
+# Python (se usi anche script py)
+__pycache__/
+*.pyc
+
+# Sistema operativo e editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# Output vari
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+*.zip
+*.tar.gz
+export/
+backup/
+backup-*/
+*.~*
+
+# Build/Output Astro/Vite
+/.astro
+/.output
+/.vercel
+/.netlify
+public/build/
+build/
+
+# Markdown preview/Obsidian (opzionale)
+.obsidian/
+.cache/
+workspace.json
+

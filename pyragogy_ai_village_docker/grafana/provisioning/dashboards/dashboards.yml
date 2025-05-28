@@ -1,0 +1,17 @@
+# Configurazione Dashboard Grafana
+
+Questo file contiene la configurazione per il provisioning automatico delle dashboard Grafana.
+
+apiVersion: 1
+
+providers:
+  - name: 'Pyragogy Dashboards'
+    orgId: 1
+    folder: 'Pyragogy'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

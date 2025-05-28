@@ -1,0 +1,18 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    url: postgres:5432
+    database: pyragogy
+    user: pyragogy
+    secureJsonData:
+      password: pyragogy_secure_password
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 100
+      maxIdleConns: 100
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    editable: true
