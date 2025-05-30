@@ -119,9 +119,4 @@ Tutto visibile via Grafana, D3.js o widget custom (anche integrabili in altre ap
 Se vuoi partecipare o integrare i tuoi agenti, consulta la [documentazione dettagliata](./docs/)  
 Aggiungi issue, fork, pull request o apri una discussione: **Pyragogy è un villaggio, non un prodotto chiuso.**
 
----
-
-**Copyright © 2025 Fabrizio Terzi  
-Pyragogy AI Village – All Rights Reserved**
-
 
